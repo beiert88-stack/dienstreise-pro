@@ -34,7 +34,18 @@ input,textarea,select{width:100%;padding:13px;border:1px solid var(--line);borde
 .chip{display:inline-block;padding:7px 10px;border-radius:999px;background:#edf4ff;color:var(--blue);margin:3px;font-size:12px;font-weight:700}
 @media print{.nav,.btn,.header{display:none!important}.app{max-width:none;background:#fff!important}.screen{display:none!important}.screen.printable{display:block!important}.card{box-shadow:none}}
 </style>
-<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0757c9"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="apple-touch-icon" href="icon.svg"></head>
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0757c9"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="apple-touch-icon" href="icon.svg"><style>
+#designEditor input[type=color]{width:100%;height:48px;padding:4px;border-radius:10px}
+#designEditor input[type=range]{width:100%}
+#designEditor select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--text);margin:5px 0 12px}
+</style><style>
+button,a,[role="button"],input[type="button"],input[type="submit"],select{
+  -webkit-tap-highlight-color:transparent;
+}
+button:active,[role="button"]:active,input[type="button"]:active,input[type="submit"]:active{
+  transform:scale(.98);
+}
+</style></head>
 <body>
 <div class="app">
 <header class="header"><h1>Dienstreise Pro</h1><p id="greeting">Ihre Dienstreisen im Überblick</p><button id="installPWA" class="btn secondary" style="display:none;margin-top:12px" onclick="installPWA()">📱 App installieren</button></header>
@@ -117,7 +128,45 @@ input,textarea,select{width:100%;padding:13px;border:1px solid var(--line);borde
 <div class="card"><label>Name</label><input id="name" placeholder="Ihr Name"><label>Unternehmen</label><input id="company" placeholder="Ihr Unternehmen"><button class="btn primary" style="width:100%;margin-top:12px" onclick="saveSettings()">Einstellungen speichern</button></div>
 <div class="card"><div class="title">Meine Fahrzeuge</div><div id="vehicles"></div>
 <button class="btn secondary" onclick="addVehicle()">＋ Fahrzeug hinzufügen</button></div>
-<div class="card"><div class="title">Privatsphäre</div>
+<div class="card feature-card" id="designEditor">
+<div class="title">🎨 App selbst gestalten</div>
+<p class="muted">Passe Farben, Hintergrund und Karten direkt in der App an. Die Einstellungen werden auf diesem Gerät gespeichert.</p>
+
+<label>Design-Vorlage</label>
+<select id="themePreset" onchange="applyPreset(this.value)">
+<option value="custom">Benutzerdefiniert</option>
+<option value="blueRed">Blau & Rot</option>
+<option value="blue">Blau</option>
+<option value="red">Rot</option>
+<option value="darkBlue">Dunkelblau</option>
+</select>
+
+<div class="row">
+  <div style="flex:1"><label>Hauptfarbe</label><input id="themePrimary" type="color" value="#0757c9" onchange="applyDesign()"></div>
+  <div style="flex:1"><label>Akzentfarbe</label><input id="themeAccent" type="color" value="#e5243f" onchange="applyDesign()"></div>
+</div>
+
+<label>Hintergrund</label>
+<select id="backgroundMode" onchange="applyDesign()">
+<option value="image">Eigenes Bild</option>
+<option value="gradient">Farbverlauf</option>
+<option value="plain">Einfarbig</option>
+</select>
+<input id="backgroundFile" type="file" accept="image/*" onchange="changeBackground(this)" style="margin-top:8px">
+<label>Hintergrundfarbe</label>
+<input id="themeBg" type="color" value="#eef3fb" onchange="applyDesign()">
+<label>Hintergrundbild-Transparenz</label>
+<input id="bgOpacity" type="range" min="0.55" max="0.97" step="0.01" value="0.88" oninput="applyDesign()">
+<div class="row"><span class="muted">Weniger sichtbar</span><span class="muted">Stärker sichtbar</span></div>
+
+<label>Karten-Transparenz</label>
+<input id="cardOpacity" type="range" min="0.72" max="1" step="0.01" value="0.94" oninput="applyDesign()">
+
+<div class="row" style="margin-top:12px">
+<button class="btn primary" onclick="applyDesign();toast('Design gespeichert')">✓ Design speichern</button>
+<button class="btn secondary" onclick="resetDesign()">↺ Zurücksetzen</button>
+</div>
+</div><div class="card"><div class="title">Privatsphäre</div>
 <label>App-PIN (optional)</label><input id="pinCode" type="password" inputmode="numeric" maxlength="6" placeholder="4–6 Ziffern">
 <button class="btn secondary" style="margin-top:10px" onclick="savePIN()">PIN speichern</button>
 <div class="muted" style="margin-top:7px">Die PIN ist ein einfacher Geräteschutz für diese Web-App.</div></div>
@@ -262,7 +311,7 @@ people:document.getElementById('rPeople').value,reason:document.getElementById('
 function finish(){state.receipts.push(r);state.events.push({type:r.type+' gespeichert',at:new Date().toISOString()});persist();closeReceipt();toast('Gespeichert');render()}
 if(file){let reader=new FileReader();reader.onload=()=>{r.image=reader.result;finish()};reader.readAsDataURL(file)}else finish();
 }
-function deleteReceipt(id){if(confirm('Diesen Eintrag löschen?')){state.receipts=state.receipts.filter(r=>r.id!==id);persist();render();}}
+function deleteReceipt(id){if(confirm('Diesen Eintrag löschen?')){state.receipts=state.receipts.filter(r=>r.id!==id);persist();render();setTimeout(loadDesignUI,100);}}
 
 function startGPS(){
 if(!state.active){toast('Bitte zuerst eine Dienstreise anlegen');return}
@@ -366,6 +415,67 @@ async function runOCR(input){
     status.textContent='Beleg erkannt. Angaben bitte prüfen.';
   }catch(e){status.textContent='OCR konnte den Beleg nicht lesen.'}
 }
+
+function getDesign(){return JSON.parse(localStorage.getItem('dienstreiseDesign')||'null')||{primary:'#0757c9',accent:'#e5243f',bg:'#eef3fb',mode:'plain',bgOpacity:.88,cardOpacity:.94,background:null}}
+function setVar(k,v){document.documentElement.style.setProperty(k,v)}
+function applyDesign(){
+  let d=getDesign();
+  d.primary=document.getElementById('themePrimary')?.value||d.primary;
+  d.accent=document.getElementById('themeAccent')?.value||d.accent;
+  d.bg=document.getElementById('themeBg')?.value||d.bg;
+  d.mode=document.getElementById('backgroundMode')?.value||d.mode;
+  d.bgOpacity=Number(document.getElementById('bgOpacity')?.value||d.bgOpacity);
+  d.cardOpacity=Number(document.getElementById('cardOpacity')?.value||d.cardOpacity);
+  localStorage.setItem('dienstreiseDesign',JSON.stringify(d));
+  setVar('--blue',d.primary); setVar('--blue2',d.primary); setVar('--red',d.accent); setVar('--red2',d.accent);
+  let app=document.querySelector('.app');
+  if(app){
+    let overlay=`rgba(238,243,251,${d.bgOpacity})`;
+    if(d.mode==='plain') app.style.background=d.bg;
+    else if(d.mode==='gradient') app.style.background=`linear-gradient(135deg,${d.primary},${d.accent})`;
+    else if(d.background) app.style.background=`linear-gradient(${overlay},${overlay}),url("${d.background}") center/cover fixed`;
+    else app.style.background=d.bg;
+  }
+  document.querySelectorAll('.card').forEach(c=>c.style.background=`rgba(255,255,255,${d.cardOpacity})`);
+}
+function changeBackground(input){
+  if(!input.files||!input.files[0])return;
+  let reader=new FileReader();
+  reader.onload=()=>{let d=getDesign();d.background=reader.result;d.mode='image';localStorage.setItem('dienstreiseDesign',JSON.stringify(d));if(document.getElementById('backgroundMode'))document.getElementById('backgroundMode').value='image';applyDesign();toast('Hintergrund übernommen')};
+  reader.readAsDataURL(input.files[0]);
+}
+function applyPreset(p){
+  let presets={
+    blueRed:{primary:'#0757c9',accent:'#e5243f',bg:'#eef3fb'},
+    blue:{primary:'#0757c9',accent:'#1688ff',bg:'#eef3fb'},
+    red:{primary:'#c91f3a',accent:'#ff5a67',bg:'#fff4f5'},
+    darkBlue:{primary:'#12315f',accent:'#1688ff',bg:'#edf2f8'}
+  };
+  if(!presets[p])return;
+  let x=presets[p];
+  document.getElementById('themePrimary').value=x.primary;
+  document.getElementById('themeAccent').value=x.accent;
+  document.getElementById('themeBg').value=x.bg;
+  applyDesign();
+}
+function resetDesign(){
+  localStorage.removeItem('dienstreiseDesign');
+  document.getElementById('themePreset').value='blueRed';
+  document.getElementById('themePrimary').value='#0757c9';
+  document.getElementById('themeAccent').value='#e5243f';
+  document.getElementById('themeBg').value='#eef3fb';
+  document.getElementById('backgroundMode').value='image';
+  document.getElementById('bgOpacity').value='.88';
+  document.getElementById('cardOpacity').value='.94';
+  applyDesign();toast('Design zurückgesetzt');
+}
+function loadDesignUI(){
+  let d=getDesign();
+  let p=document.getElementById('themePrimary'),a=document.getElementById('themeAccent'),b=document.getElementById('themeBg'),m=document.getElementById('backgroundMode'),o=document.getElementById('bgOpacity'),c=document.getElementById('cardOpacity');
+  if(p)p.value=d.primary;if(a)a.value=d.accent;if(b)b.value=d.bg;if(m)m.value=d.mode;if(o)o.value=d.bgOpacity;if(c)c.value=d.cardOpacity;
+  applyDesign();
+}
+
 function saveContent(){let t=state.trips.find(t=>t.id===state.active);if(!t){toast('Keine aktive Reise');return}t.topic=document.getElementById('topic').value;t.desc=document.getElementById('desc').value;t.people=document.getElementById('people').value;t.results=document.getElementById('results').value;t.open=document.getElementById('open').value;persist();toast('Gespeichert')}
 function saveSettings(){state.settings.name=document.getElementById('name').value;state.settings.company=document.getElementById('company').value;persist();toast('Einstellungen gespeichert');render()}
 function exportCSV(){let rows=[['Ort','Beginn','Ende','Zweck','Verkehrsmittel','Stunden'],...state.trips.map(t=>[t.place,t.start,t.end,t.purpose,t.transport,(t.hours||0).toFixed(2)]),[],['Belege & Bilder'],['Art','Titel','Datum','Betrag','Währung','Teilnehmer','Geschäftlicher Anlass','Notiz'],...state.receipts.map(r=>[r.type,r.title,r.date,r.amount,r.currency,r.people,r.reason,r.note]),[],['Teilstrecken'],['Art','Von','Nach','Fahrzeug','Kilometer','Kosten','Notiz'],...state.segments.map(s=>[s.type,s.from,s.to,s.vehicle,s.km,s.cost,s.note])];let csv=rows.map(r=>r.map(v=>`"${String(v||'').replaceAll('"','""')}"`).join(';')).join('\\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='dienstreisen.csv';a.click()}
@@ -379,4 +489,16 @@ let deferredInstallPrompt=null;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;let b=document.getElementById('installPWA');if(b)b.style.display='block';});
 async function installPWA(){if(!deferredInstallPrompt){toast('Chrome bietet die Installation derzeit nicht an');return}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;let b=document.getElementById('installPWA');if(b)b.style.display='none';}
 if('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-</script></body></html>
+</script>
+<script>
+(function(){
+  function vibrate(){
+    try { if (navigator.vibrate) navigator.vibrate(18); } catch(e) {}
+  }
+  document.addEventListener('click', function(e){
+    const el=e.target.closest('button,a,[role="button"],input[type="button"],input[type="submit"],select');
+    if(el && !el.disabled) vibrate();
+  }, true);
+})();
+</script>
+</body></html>
